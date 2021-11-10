@@ -1,0 +1,24 @@
+{
+  "name": "StreamCom",
+  "version": "1.0.0",
+  "description": "An interface which allows an easy communication between the User and the Dev-Board.",
+  "keywords": "ethernet, wifi, iot, communication, stream",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/CodeName-666/StreamCom.git"
+  },
+  "authors":
+  [
+    {
+      "name": "Christof Seidel",
+      "email": "me@andrew-smith.com",
+      "url": "https://www.andrew-smith/contact",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  },
+  "frameworks": "Arduino",
+  "platforms": "*"
+}
