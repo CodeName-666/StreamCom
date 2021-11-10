@@ -12,13 +12,12 @@
   [
     {
       "name": "Christof Seidel",
-      "email": "me@andrew-smith.com",
-      "url": "https://www.andrew-smith/contact",
+      "email": "SeidC2221@gmail.com",
+      "url": "",
       "maintainer": true
     }
   ],
   "license": "MIT",
-  },
   "frameworks": "Arduino",
   "platforms": "*"
 }

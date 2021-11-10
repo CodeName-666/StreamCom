@@ -10,9 +10,6 @@
 
 #include "Arduino.h"
 
-#if __has_include("modules/streamcom/setup/bsw_streamcom_setup.h")
-    #include "modules/streamcom/setup/bsw_streamcom_setup.h"
-#endif
 
 #ifndef STREAMCOM_ENABLED
 	#define STREAMCOM_ENABLED												true
