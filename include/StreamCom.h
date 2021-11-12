@@ -1,7 +1,7 @@
 /*
- * SerialProtocol.h
+ * StreamCom.h
  *
- *  Created on: 14.11.2018
+ *  Created on: 12.11.2021
  *      Author: c.seidel
  */
 
@@ -29,6 +29,14 @@
 
 
 #if (STREAMCOM_ENABLED == true)
+
+#define STEAMCOM_GET_VALUE(RTYPE,PTR,PNUM)							\
+		**(RTYPE**)(PTR + PNUM * sizeof(void*))
+
+
+#define STEAMCOM_GET_PTR(RTYPE,PTR,PNUM)							\
+		*(RTYPE**)(PTR + PNUM * sizeof(void*))
+
 
 typedef void (*StreamCom_Callback)(Stream* stream, void* args, uint32_t nParams);
 

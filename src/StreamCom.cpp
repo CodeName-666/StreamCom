@@ -1,7 +1,7 @@
 /*
- * SerialProtocol.cpp
+ * StreamCom.cpp
  *
- *  Created on: 14.11.2018
+ *  Created on: 12.11.2021
  *      Author: c.seidel
  */
 
@@ -158,7 +158,7 @@ void StreamCom::executeCallback(uint8_t paramListIdx)
 	ParamList_t* entry = (ParamList_t*)&m_paramList[paramListIdx];
 	if(entry->callback != nullptr)
 	{
-		entry->callback(m_stream, entry->params[0],entry->nParams);
+		entry->callback(m_stream, entry->params,entry->nParams);
 	}
 	return;
 }
