@@ -1,8 +1,8 @@
 {
   "name": "StreamCom",
-  "version": "1.0.0",
-  "description": "An interface which allows an easy communication between the User and the Dev-Board.",
-  "keywords": "ethernet, wifi, iot, communication, stream",
+  "version": "1.1.1",
+  "description": "CMD Interface for easy communiction over all Stream interfaces.",
+  "keywords": "ethernet, wifi, iot, communication, stream, telnet, cmd, cli, interface, parser ",
   "repository":
   {
     "type": "git",

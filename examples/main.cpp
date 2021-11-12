@@ -73,7 +73,20 @@ StreamCom streamComTelnet;
 uint32_t last_set_i_var = 0; /* Parameter to print only on change*/
 wl_status_t wifi_status;
 
-
+/**
+ * Usage of StreamCom: 
+ * 
+ * a. Connect over Serial/Telnet or other Stream interface.
+ * b. Enter of Commands the following way (here for PID Command):
+ *      PID=15;0.12;0.23
+ * 
+ * c. Result: PDI Callback [set_pid] should be called and executed with
+ *    parsed parameter.
+ * 
+ * Hint: Token to identify Command and Data is '=' [default].
+ *       Token to differ between parameter is ';' [default].
+ * 
+ */
 void setup(void) 
 {
     /*.... Usage of SteamCom over Serial ...*/
