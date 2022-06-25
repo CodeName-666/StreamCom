@@ -9,7 +9,6 @@
 
 #include "StreamCom.h"
 
-#if (STREAMCOM_ENABLED == true)
 
 /*******************************************************************************
  *  FUNCTION:
@@ -322,6 +321,3 @@ bool StreamCom::stringVerify(String* readString)
 	}
 	return ret;
 }
-
-
-#endif

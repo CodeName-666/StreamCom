@@ -10,11 +10,6 @@
 
 #include "Arduino.h"
 
-
-#ifndef STREAMCOM_ENABLED
-	#define STREAMCOM_ENABLED												true
-#endif
-
 #ifndef STREAM_COM_MAX_PARAMETER
 	#define STREAM_COM_MAX_PARAMETER										  4u
 #endif
@@ -27,8 +22,6 @@
 	#define STREAM_COM_PARAM_DELIMITER								    	 ";"
 #endif 
 
-
-#if (STREAMCOM_ENABLED == true)
 
 #define STEAMCOM_GET_VALUE(RTYPE,PTR,PNUM)							\
 		**(RTYPE**)(PTR + PNUM * sizeof(void*))
@@ -111,5 +104,4 @@ class StreamCom
 
 
 };
-#endif /*ENABLE StreamCom*/
 #endif /* StreamCom_H_ */
