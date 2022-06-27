@@ -22,15 +22,41 @@
 	#define STREAM_COM_PARAM_DELIMITER								    	 ";"
 #endif 
 
-
+/**
+ * @brief Marco to get the parameter values of a implemented callback function
+ * to get a paramter of the Configuration
+ * 
+ * @param RTYPE Type of the parameter. For example uint16_t, uint32_t etc.
+ * @param PTR Pointer to the arguments of the callback. 
+ * @param PNUM The number of the paramter. Max. is the configured number of prameter of an config entry.
+ * 
+ * Each implemented callback has three prameter. [stream, args, nPrams]. This macro allows you to get the value
+ * of the args pointer. This pointer refers to the paramter, which where configured in the ParamList_t configuration. 
+ * To make it easy to get the value, this macro should be used.
+ * 
+ */
 #define STEAMCOM_GET_VALUE(RTYPE,PTR,PNUM)							\
 		**(RTYPE**)(PTR + PNUM * sizeof(void*))
 
-
+/**
+ * @brief Marco to get the parameter pointer of a implemented callback function
+ * to get a paramter of the Configuration
+ * 
+ * @param RTYPE Type of the parameter. For example uint16_t, uint32_t etc.
+ * @param PTR Pointer to the arguments of the callback. 
+ * @param PNUM The number of the paramter. Max. is the configured number of prameter of an config entry.
+ * 
+ * Each implemented callback has three prameter. [stream, args, nPrams]. This macro allows you to get the pointer to the values
+ * of the args pointer. This pointer refers to the paramter, which where configured in the ParamList_t configuration. 
+ * To make it easy to get the value, this macro should be used.
+ * 
+ */
 #define STEAMCOM_GET_PTR(RTYPE,PTR,PNUM)							\
 		*(RTYPE**)(PTR + PNUM * sizeof(void*))
 
-
+/**
+ * @brief Callback function for the StreamCom configuration
+ */
 typedef void (*StreamCom_Callback)(Stream* stream, void* args, uint32_t nParams);
 
 enum Types_e{
