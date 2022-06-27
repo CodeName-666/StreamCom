@@ -61,14 +61,17 @@ The library depends on the configuration of the commands. This needs to be done 
 ### Configuration struct ParamList_t
  
 **- Command:**
+
 Each entry needs a `token` which represents the command of a service. 
  
 **- Parameter:**
+
 Each command can contain a set of parameters, which will be stored in the array `params`. There are a max number of allowed parameter which is defined over the macro `STREAM_COM_MAX_PARAMETER` and is **4**as default. 
  
 If needed, a new definition of `STREAM_COM_MAX_PARAMETER` can be done to change the maximum number of parameter.
  
 **- Parameter Types:**
+
 For each parameter which was configured in the `params` pointer, a type needs to be defined. This is needed,because the StreamCom Library needs to which type a parameter has. 
  
 The following types are available: 
@@ -89,10 +92,12 @@ enum Types_e{
 ```
  
 **- Number of Parameter**
+
 This number shall include the number of configured parameter. This value can differ from the max allowed number of parameter, but it has to be smaller than the max. number.
  
  
 **- Callback Function [Optional]**
+
 For each service an own callback can be configured. Each time the service was called, this callback will be executed. The callback is defined as following:
  
 ```c++
@@ -120,6 +125,7 @@ ParamList_t paramlist[NUMBER_OF_COMMANDS] = {
  
 ```
 1. **Service:** *Reset*
+
     - Command: "RESET"
     - Parameter: No Parameter - Max Parameter = 4, therefore 4 time NULL
     - Parameter Type: 4 times NONE, because of Max Parameter = 4.
@@ -127,6 +133,7 @@ ParamList_t paramlist[NUMBER_OF_COMMANDS] = {
     - Callback: reset
  
 2.  **Service:** *SET_I*
+
     - Command: "RESET"
     - Parameter: 1 parameter - &set_i_var
     - Parameter Type: 1 times "I32", 3 times "NONE"
