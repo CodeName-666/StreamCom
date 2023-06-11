@@ -219,6 +219,7 @@ template<typename T> T StreamCom::convert(Types_e type, uint8_t paramIdx)
 		case D:
 			return static_cast<T>(m_params[paramIdx].toDouble());
 		case STR:
+		case RAW:
 		default:
 			return static_cast<T>(0); //Return converted 0 because String don't need to be converted.
 	}
@@ -279,6 +280,7 @@ void StreamCom::convertParameter(uint8_t paramListIdx)
 					*str = String(m_params[index]);
 					break;
 				}
+				case RAW: 
 				case NONE:
 				default:
 				{
@@ -314,10 +316,76 @@ bool StreamCom::stringVerify(String* readString)
 			readString->remove(readString->length()-3,2);
 		}
 
-		if(!readString->isEmpty())
+		if(readString->length() > 0)
 		{
 			ret = true;
 		}
 	}
 	return ret;
 }
+
+
+/**
+ * @brief Gibt eine Hilfe mit allen konfigurierten Parametern aus.
+ */
+void StreamCom::printHelp()
+{
+    m_stream->println("Available commands:");
+
+    for (uint16_t i = 0; i < m_list_size; i++)
+    {
+        const ParamList_t& paramList = m_paramList[i];
+        m_stream->print("Command: ");
+        m_stream->println(paramList.token);
+
+        if (paramList.nParams > 0)
+        {
+            m_stream->println("Parameters:");
+
+            for (uint8_t j = 0; j < paramList.nParams; j++)
+            {
+                m_stream->print("  - Parameter ");
+                m_stream->print(j + 1);
+                m_stream->print(": ");
+
+                switch (paramList.paramTypes[j])
+                {
+                    case I8:
+                        m_stream->println("Signed 8-bit integer");
+                        break;
+                    case I16:
+                        m_stream->println("Signed 16-bit integer");
+                        break;
+                    case I32:
+                        m_stream->println("Signed 32-bit integer");
+                        break;
+                    case I64:
+                        m_stream->println("Signed 64-bit integer");
+                        break;
+                    case F:
+                        m_stream->println("Floating-point number");
+                        break;
+                    case D:
+                        m_stream->println("Double-precision floating-point number");
+                        break;
+                    case STR:
+                        m_stream->println("String");
+                        break;
+					case NONE: 
+						m_stream->println("No Parameter");
+						break;
+                    default:
+                        m_stream->println("Unknown type");
+                        break;
+                }
+            }
+        }
+        else
+        {
+            m_stream->println("No parameters.");
+        }
+
+        m_stream->println();
+    }
+}
+
