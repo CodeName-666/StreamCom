@@ -1,15 +1,13 @@
 {
   "name": "StreamCom",
   "version": "1.1.2",
-  "description": "CMD Interface for easy communiction over all Stream interfaces.",
-  "keywords": "ethernet, wifi, iot, communication, stream, telnet, cmd, cli, interface, parser ",
-  "repository":
-  {
+  "description": "CMD Interface for easy communication over all Stream interfaces.",
+  "keywords": "ethernet, wifi, iot, communication, stream, telnet, cmd, cli, interface, parser",
+  "repository": {
     "type": "git",
     "url": "https://github.com/CodeName-666/StreamCom.git"
   },
-  "authors":
-  [
+  "authors": [
     {
       "name": "Christof Seidel",
       "email": "SeidC2221@gmail.com",
@@ -18,5 +16,11 @@
   ],
   "license": "MIT",
   "frameworks": "Arduino",
-  "platforms": "*"
+  "platforms": "*",
+  "dependencies": [
+    {
+      "name": "ArduinoSTL",
+      "platforms": ["atmelavr", "atmelmegaavr"]
+    }
+  ]
 }

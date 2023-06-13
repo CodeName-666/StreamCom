@@ -41,7 +41,7 @@ static void StreamCom_Help(Stream* stream, void* args, uint32_t nParams)
 
 StreamCom* mThis;						
 
-ParamList_t StreamCom_default_list[STREAM_COM_DEFAULT_LIST_SIZE] = 
+Service_t StreamCom_default_list[STREAM_COM_DEFAULT_LIST_SIZE] = 
 {
 /*Nr.  | TOKEN          |   POINTER_TO_PARAMS         |    TYPE_OF_PARAMS    | SIZE  | CALLBACK       |*/
 /* 1*/ {"RESET"			, {mThis,NULL,NULL,NULL}       , {RAW,NONE,NONE,NONE},  0    , StreamCom_Reset},

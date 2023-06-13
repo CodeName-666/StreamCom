@@ -89,9 +89,14 @@ void StreamCom::loop(void)
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-void StreamCom::init(Stream & stream, ParamList_t* paramList, uint16_t size)
+void StreamCom::init(Stream & stream, Service_t* paramList, uint16_t size)
 {
 	m_stream = &stream;
+	for(uint16_t i = 0; i < size; i++)
+	{
+		m_paramList.push_back(paramList[i]);
+	}
+
 	m_paramList = paramList;
 	m_list_size = size;
 
@@ -154,7 +159,7 @@ void StreamCom::stringSplit(String* strToSplit, String* strToStore, const char* 
  ******************************************************************************/
 void StreamCom::executeCallback(uint8_t paramListIdx)
 {
-	ParamList_t* entry = (ParamList_t*)&m_paramList[paramListIdx];
+	Service_t* entry = (Service_t*)&m_paramList[paramListIdx];
 	if(entry->callback != nullptr)
 	{
 		entry->callback(m_stream, entry->params,entry->nParams);
@@ -230,7 +235,7 @@ template<typename T> T StreamCom::convert(Types_e type, uint8_t paramIdx)
  ******************************************************************************/
 void StreamCom::convertParameter(uint8_t paramListIdx)
 {	
-	ParamList_t* entry = (ParamList_t*)&m_paramList[paramListIdx];
+	Service_t* entry = (Service_t*)&m_paramList[paramListIdx];
 	if(paramListIdx < m_list_size)
 	{
 		for(uint8_t i = 0; i < entry->nParams; i++)
@@ -334,7 +339,7 @@ void StreamCom::printHelp()
 
     for (uint16_t i = 0; i < m_list_size; i++)
     {
-        const ParamList_t& paramList = m_paramList[i];
+        const Service_t& paramList = m_paramList[i];
         m_stream->print("Command: ");
         m_stream->println(paramList.token);
 

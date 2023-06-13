@@ -9,6 +9,7 @@
 #define StreamCom_H_
 
 #include "Arduino.h"
+#include "vector"
 
 #ifndef STREAM_COM_DEFAULT_LIST_ENABLE
 	#define STREAM_COM_DEFAULT_LIST_ENABLE									true
@@ -35,7 +36,7 @@
  * @param PNUM The number of the paramter. Max. is the configured number of prameter of an config entry.
  * 
  * Each implemented callback has three prameter. [stream, args, nPrams]. This macro allows you to get the value
- * of the args pointer. This pointer refers to the paramter, which where configured in the ParamList_t configuration. 
+ * of the args pointer. This pointer refers to the paramter, which where configured in the Service_t configuration. 
  * To make it easy to get the value, this macro should be used.
  * 
  */
@@ -51,7 +52,7 @@
  * @param PNUM The number of the paramter. Max. is the configured number of prameter of an config entry.
  * 
  * Each implemented callback has three prameter. [stream, args, nPrams]. This macro allows you to get the pointer to the values
- * of the args pointer. This pointer refers to the paramter, which where configured in the ParamList_t configuration. 
+ * of the args pointer. This pointer refers to the paramter, which where configured in the Service_t configuration. 
  * To make it easy to get the value, this macro should be used.
  * 
  */
@@ -95,7 +96,7 @@ typedef void (*StreamCom_Callback)(Stream* stream, void* args, uint32_t nParams)
  *
  * @note The enumerators are assigned specific integer values to represent the corresponding data types.
  *
- * @see ParamList_t
+ * @see Service_t
  */
 enum Types_e {
     I8   = 0,   //!< Represents the data type int8_t.
@@ -113,7 +114,7 @@ enum Types_e {
 /**
  * @brief Structure representing a parameter list for a command in StreamCom.
  *
- * The ParamList_t structure represents a parameter list for a specific command in the StreamCom class. It holds information
+ * The Service_t structure represents a parameter list for a specific command in the StreamCom class. It holds information
  * about the command, its parameters, and the associated callback function.
  *
  * @param token     A string command/token used to identify the input.
@@ -149,7 +150,7 @@ enum Types_e {
  * }
  *
  * // Define a parameter list for a command
- * ParamList_t myCommand = {
+ * Service_t myCommand = {
  *     .token = "TestCmd",
  *     .params = {&i, &j, &k, nullptr},
  *     .paramTypes = {I8, I16, F, NONE},
@@ -170,7 +171,10 @@ typedef struct
     uint32_t nParams;
     StreamCom_Callback callback;
 
-} ParamList_t;
+} Service_t;
+
+
+using ServiceList = std::vector<Service_t&>;
 
 
 
@@ -196,7 +200,7 @@ public:
      * @param paramList Die Parameterliste.
      * @param size Die Größe der Parameterliste.
      */
-    void init(Stream &stream, ParamList_t* paramList, uint16_t size);
+    void init(Stream &stream, Service_t* paramList, uint16_t size);
 
     void printHelp(void);
 
@@ -262,7 +266,7 @@ private:
     bool paramsAvailable(uint8_t paramListIdx);
 
 private:
-    ParamList_t* m_paramList;                        /**< Die Parameterliste. */
+    ServiceList m_paramList;                        /**< Die Parameterliste. */
     uint16_t m_list_size;                            /**< Die Größe der Parameterliste. */
     String m_params[STREAM_COM_MAX_PARAMETER];       /**< Die Parameter. */
 
