@@ -27,6 +27,11 @@
 	#define STREAM_COM_PARAM_DELIMITER								    	 ";"
 #endif 
 
+#if STREAM_COM_DEFAULT_LIST_ENABLE == true
+    #define STREAM_COM_DEFAULT_LIST_SIZE                                      3u
+#endif
+
+
 /**
  * @brief Marco to get the parameter values of a implemented callback function
  * to get a paramter of the Configuration
@@ -174,7 +179,7 @@ typedef struct
 } Service_t;
 
 
-using ServiceList = std::vector<Service_t&>;
+using ServiceList = std::vector<Service_t*>;
 
 
 
@@ -203,6 +208,8 @@ public:
     void init(Stream &stream, Service_t* paramList, uint16_t size);
 
     void printHelp(void);
+
+    uint16_t get_service_quantity(void);
 
 private:
     /**
