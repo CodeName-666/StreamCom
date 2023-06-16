@@ -12,57 +12,56 @@
 #include "vector"
 
 #ifndef STREAM_COM_DEFAULT_LIST_ENABLE
-	#define STREAM_COM_DEFAULT_LIST_ENABLE									true
+#define STREAM_COM_DEFAULT_LIST_ENABLE true
 #endif
 
 #ifndef STREAM_COM_MAX_PARAMETER
-	#define STREAM_COM_MAX_PARAMETER										  4u
+#define STREAM_COM_MAX_PARAMETER 4u
 #endif
 
 #ifndef STREAM_COM_CDM_DELIMITER
-	#define STREAM_COM_CDM_DELIMITER							             "="
+#define STREAM_COM_CDM_DELIMITER "="
 #endif
 
 #ifndef STREAM_COM_PARAM_DELIMITER
-	#define STREAM_COM_PARAM_DELIMITER								    	 ";"
-#endif 
-
-#if STREAM_COM_DEFAULT_LIST_ENABLE == true
-    #define STREAM_COM_DEFAULT_LIST_SIZE                                      3u
+#define STREAM_COM_PARAM_DELIMITER ";"
 #endif
 
+#if STREAM_COM_DEFAULT_LIST_ENABLE == true
+#define STREAM_COM_DEFAULT_LIST_SIZE 3u
+#endif
 
 /**
  * @brief Marco to get the parameter values of a implemented callback function
  * to get a paramter of the Configuration
- * 
+ *
  * @param RTYPE Type of the parameter. For example uint16_t, uint32_t etc.
- * @param PTR Pointer to the arguments of the callback. 
+ * @param PTR Pointer to the arguments of the callback.
  * @param PNUM The number of the paramter. Max. is the configured number of prameter of an config entry.
- * 
+ *
  * Each implemented callback has three prameter. [stream, args, nPrams]. This macro allows you to get the value
- * of the args pointer. This pointer refers to the paramter, which where configured in the Service_t configuration. 
+ * of the args pointer. This pointer refers to the paramter, which where configured in the Service_t configuration.
  * To make it easy to get the value, this macro should be used.
- * 
+ *
  */
-#define STEAMCOM_GET_VALUE(RTYPE,PTR,PNUM)							\
-		**(RTYPE**)(PTR + PNUM * sizeof(void*))
+#define STREAMCOM_GET_VALUE(RTYPE, PTR, PNUM) \
+    **(RTYPE **)(PTR + PNUM * sizeof(void *))
 
 /**
  * @brief Marco to get the parameter pointer of a implemented callback function
  * to get a paramter of the Configuration
- * 
+ *
  * @param RTYPE Type of the parameter. For example uint16_t, uint32_t etc.
- * @param PTR Pointer to the arguments of the callback. 
+ * @param PTR Pointer to the arguments of the callback.
  * @param PNUM The number of the paramter. Max. is the configured number of prameter of an config entry.
- * 
+ *
  * Each implemented callback has three prameter. [stream, args, nPrams]. This macro allows you to get the pointer to the values
- * of the args pointer. This pointer refers to the paramter, which where configured in the Service_t configuration. 
+ * of the args pointer. This pointer refers to the paramter, which where configured in the Service_t configuration.
  * To make it easy to get the value, this macro should be used.
- * 
+ *
  */
-#define STEAMCOM_GET_PTR(RTYPE,PTR,PNUM)							\
-		*(RTYPE**)(PTR + PNUM * sizeof(void*))
+#define STREAMCOM_GET_PTR(RTYPE, PTR, PNUM) \
+    *(RTYPE **)(PTR + PNUM * sizeof(void *))
 
 /**
  * @brief Definition of the StreamCom callback function type.
@@ -75,7 +74,7 @@
  *                the specific implementation of the callback.
  * @param nParams The number of parameters passed to the callback.
  *
- * 
+ *
  * The StreamCom callback function should have a `void` return type and match the defined function signature. It can be used
  * to perform custom actions based on the received command and its parameters. The implementation of the callback function
  * should handle the desired logic and utilize the provided parameters to accomplish the intended functionality.
@@ -91,7 +90,7 @@
  *
  * @see StreamCom
  */
-typedef void (*StreamCom_Callback)(Stream* stream, void* args, uint32_t nParams);
+typedef void (*StreamCom_Callback)(Stream *stream, void *args, uint32_t nParams);
 
 /**
  * @brief Enumeration representing the supported data types in StreamCom.
@@ -103,18 +102,18 @@ typedef void (*StreamCom_Callback)(Stream* stream, void* args, uint32_t nParams)
  *
  * @see Service_t
  */
-enum Types_e {
-    I8   = 0,   //!< Represents the data type int8_t.
-    I16  ,      //!< Represents the data type int16_t.
-    I32  ,      //!< Represents the data type int32_t.
-    I64  ,      //!< Represents the data type int64_t.
-    F    ,      //!< Represents the data type float.
-    D    ,      //!< Represents the data type double.
-    STR  ,      //!< Represents the data type String.
-    RAW,        //!< Represents the data type Classes/Structs.
-    NONE        //!< Represents no type or indicates that the type is not used.
+enum Types_e
+{
+    I8 = 0, //!< Represents the data type int8_t.
+    I16,    //!< Represents the data type int16_t.
+    I32,    //!< Represents the data type int32_t.
+    I64,    //!< Represents the data type int64_t.
+    F,      //!< Represents the data type float.
+    D,      //!< Represents the data type double.
+    STR,    //!< Represents the data type String.
+    RAW,    //!< Represents the data type Classes/Structs.
+    NONE    //!< Represents no type or indicates that the type is not used.
 };
-
 
 /**
  * @brief Structure representing a parameter list for a command in StreamCom.
@@ -170,116 +169,142 @@ enum Types_e {
  */
 typedef struct
 {
-    const char* token;
-    void* params[STREAM_COM_MAX_PARAMETER];
+    const char *token;
+    void *params[STREAM_COM_MAX_PARAMETER];
     Types_e paramTypes[STREAM_COM_MAX_PARAMETER];
     uint32_t nParams;
     StreamCom_Callback callback;
 
 } Service_t;
 
-
-using ServiceList = std::vector<Service_t*>;
-
-
+using ServiceList = std::vector<Service_t *>;
 
 /**
- * @brief Klasse zur Kommunikation über einen Stream.
+ * @brief class to communicate over a stream.
  */
 class StreamCom
 {
 public:
     /**
-     * @brief Konstruktor für die StreamCom-Klasse.
+     * @brief constructor for the StreamCom class.
      */
     StreamCom(void);
 
     /**
-     * @brief Haupt-Loop für die StreamCom-Klasse.
+     * @brief main loop for the StreamCom class.
      */
     void loop(void);
 
     /**
-     * @brief Initialisiert die StreamCom-Klasse.
-     * @param stream Der Stream, über den die Kommunikation erfolgen soll.
-     * @param paramList Die Parameterliste.
-     * @param size Die Größe der Parameterliste.
+     * @brief Initializes the StreamCom class.
+     * @param stream The stream over which the communication should take place.
+     * @param paramList The parameter list.
+     * @param size The size of the parameter list.
      */
-    void init(Stream &stream, Service_t* paramList, uint16_t size);
+    void init(Stream &stream, Service_t *paramList, uint16_t size);
 
+    /**
+     * @brief Prints the help information.
+     */
     void printHelp(void);
 
-    uint16_t get_service_quantity(void);
+    /**
+     * @brief Gets the quantity of services.
+     * @return The number of services.
+     */
+    uint16_t getServiceQuantity(void);
+
+    /**
+     * @brief Adds a service to the parameter list.
+     * @param service The service to be added.
+     */
+    void addService(Service_t& service);
+
+    /**
+     * @brief Deletes a service from the parameter list based on the entry index.
+     * @param service_entry The index of the service entry to be deleted.
+     */
+    void deleteService(uint16_t service_entry);
+
+    /**
+     * @brief Deletes a service from the parameter list based on the service token.
+     * @param service_token The token of the service to be deleted.
+     */
+    void deleteService(const char *service_token);
 
 private:
     /**
-     * @brief Teilt einen String anhand eines Trennzeichens.
-     * @param strToSplit Der zu teilende String.
-     * @param strToStore Der Ziel-String zum Speichern der geteilten Teile.
-     * @param delimiter Das Trennzeichen.
+     * @brief Splits a string using a separator.
+     * @param strToSplit The string to split.
+     * @param strToStore The destination string to store the split parts.
+     * @param delimiter The delimiter character.
      */
-    void stringSplit(String* strToSplit, String* strToStore, const char* delimiter);
+    void stringSplit(String *strToSplit, String *strToStore, const char *delimiter);
 
     /**
-     * @brief Überprüft, ob ein String gültig ist.
-     * @param readString Der zu überprüfende String.
-     * @return True, wenn der String gültig ist, ansonsten False.
+     * @brief Checks if a string is valid.
+     * @param readString The string to check.
+     * @return True if the string is valid, False otherwise.
      */
-    bool stringVerify(String* readString);
+    bool stringVerify(String *readString);
 
     /**
-     * @brief Teilt einen Parameter-String in einzelne Parameter und speichert sie in der Parameterliste.
-     * @param paramStr Der zu teilende Parameter-String.
-     * @param paramListIdx Der Index in der Parameterliste, in den die Parameter gespeichert werden sollen.
-     * @return True, wenn die Aufteilung erfolgreich war, ansonsten False.
+     * @brief Splits a parameter string into individual parameters and stores them in the parameter list.
+     * @param paramStr The parameter string to split.
+     * @param paramListIdx The index in the parameter list to store the parameters in.
+     * @return True if the split was successful, False otherwise.
      */
-    bool splitParameter(String* paramStr, uint8_t paramListIdx);
+    bool splitParameter(String *paramStr, uint8_t paramListIdx);
 
     /**
-     * @brief Konvertiert einen Parameter in den entsprechenden Typ.
-     * @param paramListIdx Der Index des Parameters in der Parameterliste.
+     * @brief Converts a parameter to the appropriate type.
+     * @param paramListIdx The index of the parameter in the parameter list.
      */
     void convertParameter(uint8_t paramListIdx);
 
     /**
-     * @brief Konvertiert einen Parameter in den angegebenen Typ.
-     * @tparam T Der Typ, in den der Parameter konvertiert werden soll.
-     * @param type Der Typ des Parameters.
-     * @param paramIdx Der Index des Parameters in der Parameterliste.
-     * @return Der konvertierte Parameter.
+     * @brief Converts a parameter to the specified type.
+     * @tparam T The type to which the parameter should be converted.
+     * @param type The type of the parameter.
+     * @param paramIdx The index of the parameter in the parameter list.
+     * @return The converted parameter.
      */
     template <typename T>
     T convert(Types_e type, uint8_t paramIdx);
 
     /**
-     * @brief Führt einen Befehl aus.
-     * @param paramStr Der Befehls-String.
-     * @param paramListIdx Der Index des Parameters in der Parameterliste.
-     * @return True, wenn der Befehl erfolgreich ausgeführt wurde, ansonsten False.
+     * @brief Executes a command.
+     * @param paramStr The command string.
+     * @param paramListIdx The index of the parameter in the parameter list.
+     * @return True if the command was executed successfully, False otherwise.
      */
-    bool executeCommand(String* paramStr, uint8_t paramListIdx);
+    bool executeCommand(String *paramStr, uint8_t paramListIdx);
 
     /**
-     * @brief Ruft die Callback-Funktion für einen Parameter auf.
-     * @param paramListIdx Der Index des Parameters in der Parameterliste.
+     * @brief Calls the callback function for a parameter.
+     * @param paramListIdx The index of the parameter in the parameter list.
      */
     void executeCallback(uint8_t paramListIdx);
 
     /**
-     * @brief Überprüft, ob Parameter für einen bestimmten Index verfügbar sind.
-     * @param paramListIdx Der Index des Parameters in der Parameterliste.
-     * @return True, wenn Parameter verfügbar sind, ansonsten False.
+     * @brief Checks if parameters are available for a given index.
+     * @param paramListIdx The index of the parameter in the parameter list.
+     * @return True if parameters are available, otherwise False.
      */
     bool paramsAvailable(uint8_t paramListIdx);
 
+    int16_t serviceExists(const char* serviceToken);
 private:
-    ServiceList m_paramList;                        /**< Die Parameterliste. */
-    uint16_t m_list_size;                            /**< Die Größe der Parameterliste. */
-    String m_params[STREAM_COM_MAX_PARAMETER];       /**< Die Parameter. */
+    ServiceList m_serviceList;                   /**< Parameter list. */
+    uint16_t m_list_size;                      /**< The size of the parameter list. */
+    String m_params[STREAM_COM_MAX_PARAMETER]; /**< The parameters. */
 
-    const char* m_cmdDelimiter;                      /**< Das Trennzeichen für Befehle. */
-    const char* m_paramDelimiter;                    /**< Das Trennzeichen für Parameter. */
-    Stream* m_stream;                                /**< Der Stream für die Kommunikation. */
+    const char *m_cmdDelimiter;   /**< The delimiter for commands. */
+    const char *m_paramDelimiter; /**< The delimiter for parameters. */
+    Stream *m_stream;             /**< The stream for communication. */
 };
+
+extern Service_t StreamCom_default_list[STREAM_COM_DEFAULT_LIST_SIZE];
+extern StreamCom *mThis;
 
 #endif /* StreamCom_H_ */

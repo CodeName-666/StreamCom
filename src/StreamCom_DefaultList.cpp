@@ -15,7 +15,7 @@
 
 StreamCom* mThis;	
 
-static void StreamCom_Reset(Stream* stream, void* args, uint32_t nParams)
+void StreamCom_Reset(Stream* stream, void* args, uint32_t nParams)
 {
     stream->print("STREAM_COM: Reset ESP \r\n");   
 #if ARDUINO_ARCH_ESP32
@@ -28,7 +28,7 @@ static void StreamCom_Reset(Stream* stream, void* args, uint32_t nParams)
 }
 
 
-static void StreamCom_Help(Stream* stream, void* args, uint32_t nParams)
+void StreamCom_Help(Stream* stream, void* args, uint32_t nParams)
 {
     if (mThis != NULL)
     {
@@ -40,12 +40,12 @@ static void StreamCom_Help(Stream* stream, void* args, uint32_t nParams)
     }
 }
 
-static void StreamCom_Size(Stream* stream, void* args, uint32_t nParams)
+void StreamCom_Size(Stream* stream, void* args, uint32_t nParams)
 {
     uint16_t size = 0;
     if (mThis != NULL)
     {
-        size = mThis->get_service_quantity();
+        size = mThis->getServiceQuantity();
         stream->print("There are: "); stream->print(size); stream->println(" Services definend");
     }
     else 
