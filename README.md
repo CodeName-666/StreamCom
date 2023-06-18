@@ -1,5 +1,3 @@
-
-```markdown
 # StreamCom
  
 This library allows you to integrate a simple CMD-like interface. It enables you to configure different commands, parameters, and, if needed, callbacks for interaction between the command line and the Arduino software. The library uses the Arduino Stream interface, making it easy to switch between communication interfaces.
