@@ -58,7 +58,7 @@ void setup(void)
 The library depends on the configuration of the commands. This needs to be done once and handover to the StreamCom. For the configuration, a parameter of type `ParamList_t` needs to be defined.
  
  
-### Configuration struct ParamList_t
+### Configuration struct Service_t
  
 **- Command:**
 
@@ -110,29 +110,19 @@ void foo(Stream* stream, void* args, uint32_t nParams) {}
 ```
 The callback is optional. All parameters which will be sent to the StreamCom Library will be read and converted to the appropriate data type and updated to the corresponding parameter of the configuration.
  
- 
-### Example of a StreamCom ParamterList_t configuration:
+### Example of a StreamCom Service_t configuration:
  
 This example shows a set of three services: 
 ```c++
 /*=== Command and Parameter definition =============================================*/
-ParamList_t paramlist[NUMBER_OF_COMMANDS] = {
+Service_t paramlist[NUMBER_OF_COMMANDS] = {
 /*-----|  CMD  |      Param Ptr List         |     Param Type List  | NrPar| Clbk |-*/
-/*[0]*/{"RESET", {NULL      ,NULL ,NULL, NULL} ,{NONE,NONE,NONE,NONE},   0 , reset},
-/*[1]*/{"SET_I", {&set_i_var,NULL ,NULL, NULL} ,{I32 ,NONE,NONE,NONE},   1 , NULL},
-/*[2]*/{"PID"  , {&p        ,&i   ,&d  , NULL} ,{I32 ,F   ,F   ,NONE},   3 , set_pid}
+/*[0]*/{"SET_I", {&set_i_var,NULL ,NULL, NULL} ,{I32 ,NONE,NONE,NONE},   1 , NULL},
+/*[1]*/{"PID"  , {&p        ,&i   ,&d  , NULL} ,{I32 ,F   ,F   ,NONE},   3 , set_pid}
 };
  
 ```
-1. **Service:** *Reset*
-
-    - Command: "RESET"
-    - Parameter: No Parameter - Max Parameter = 4, therefore 4 time NULL
-    - Parameter Type: 4 times NONE, because of Max Parameter = 4.
-    - Number Parameter: 0 
-    - Callback: reset
- 
-2.  **Service:** *SET_I*
+1.  **Service:** *SET_I*
 
     - Command: "RESET"
     - Parameter: 1 parameter - &set_i_var
@@ -142,7 +132,15 @@ ParamList_t paramlist[NUMBER_OF_COMMANDS] = {
  
 ...
  
- 
+### Defaulte Services:
+
+There are some default services configured, which can be used from the beginning:
+
+    - RESET - Creates a SW - Reset on the ECU
+    - HELP  - Gives us detailed information about the configured/added Services
+    - NUM   - Returns the number of Services
+
+With futher updates there will be futher new default services. 
  
 ## Integration of the StreamCom Library: 
  
