@@ -116,13 +116,21 @@ Service_t paramlist[NUMBER_OF_COMMANDS] = {
 };
 ```
  
-1.  **Service:** *SET_I*
+0.  **Service:** *SET_I*
  
-    - Command: "RESET"
+    - Command: "SET_I"
     - Parameter: 1 parameter - &set_i_var
     - Parameter Type: 1 times "I32", 3 times "NONE"
     - Number Parameter: 1
     - Callback: Not used...
+
+1.  **Service:** *PID*
+ 
+    - Command: "PID"
+    - Parameter: 3 parameter - &p | &i | &D
+    - Parameter Type: 1 times "I32", 2 times "F" , 1 times "NONE"
+    - Number Parameter: 3
+    - Callback: set_pid
  
 ...
  
