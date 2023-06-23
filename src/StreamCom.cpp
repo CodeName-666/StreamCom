@@ -246,7 +246,7 @@ template<typename T> T StreamCom::convert(Types_e type, uint8_t paramIdx)
  ******************************************************************************/
 void StreamCom::convertParameter(uint8_t paramListIdx)
 {	
-	Service_t* entry = (Service_t*)&m_serviceList[paramListIdx];
+	Service_t* entry = (Service_t*)m_serviceList[paramListIdx];
 	if(paramListIdx < m_serviceList.size())
 	{
 		for(uint8_t i = 0; i < entry->nParams; i++)
