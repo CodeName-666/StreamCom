@@ -1,8 +1,8 @@
 {
   "name": "StreamCom",
-  "version": "2.2.0",
-  "description": "CMD Interface for easy communication over all Stream interfaces.",
-  "keywords": "ethernet, wifi, iot, communication, stream, telnet, cmd, cli, interface, parser",
+  "version": "2.3.0",
+  "description": "Typed command parser for Arduino Stream interfaces with callbacks, per-stream default commands, validated parameters and non-blocking input reception.",
+  "keywords": ["arduino", "stream", "serial", "telnet", "cli", "command-parser"],
   "repository": {
     "type": "git",
     "url": "https://github.com/CodeName-666/StreamCom.git"
@@ -15,12 +15,13 @@
     }
   ],
   "license": "MIT",
-  "frameworks": "Arduino",
-  "platforms": "*",
+  "frameworks": "arduino",
+  "platforms": ["atmelavr", "espressif32", "espressif8266"],
   "dependencies": [
     {
       "name": "ArduinoSTL",
-      "platforms": ["atmelavr", "atmelmegaavr"]
+      "version": "^1.3.3",
+      "platforms": ["atmelavr"]
     }
   ]
 }

@@ -1,28 +1,80 @@
-/*
- * StreamCom.cpp
+/**
+ * @file StreamCom.cpp
+ * @brief Stream command parsing and service dispatch.
  *
  *  Created on: 12.11.2021
  *      Author: c.seidel
  */
 
 #include "StreamCom.h"
+#include <errno.h>
+#include <float.h>
+#include <math.h>
 
-// TREAM_COM_DEFAULT_LIST_ENABLE == true
-// n StreamCom* mThis;
-// n Service_t StreamCom_default_list;
-// #endif
+/** @brief Parse a signed decimal, including the full int64_t range on AVR.
+ * @param[in] text Input. @param[out] value Result. @return True for a complete valid number. */
+static bool parseInteger(const String &text, int64_t &value)
+{
+	const char *pCharacter = text.c_str();
+	bool       isNegative  = false;
+	uint64_t   magnitude   = 0U;
+	uint64_t   limit       = 0U;
+	bool       isValid     = false;
+
+	if ((*pCharacter == '-') || (*pCharacter == '+'))
+	{
+		isNegative = (*pCharacter == '-');
+		++pCharacter;
+	}
+	isValid = (*pCharacter != '\0');
+	limit = static_cast<uint64_t>(INT64_MAX) + (isNegative ? 1U : 0U);
+	while (isValid && (*pCharacter != '\0'))
+	{
+		const uint8_t digit = static_cast<uint8_t>(*pCharacter - '0');
+
+		if ((*pCharacter < '0') || (*pCharacter > '9'))
+		{
+			isValid = false;
+		}
+		else
+		{
+			if (magnitude > (limit - digit) / 10U)
+			{
+				isValid = false;
+			}
+			else
+			{
+				magnitude = magnitude * 10U + digit;
+			}
+		}
+		++pCharacter;
+	}
+	if (isValid)
+	{
+		if (isNegative && magnitude == static_cast<uint64_t>(INT64_MAX) + 1U)
+		{
+			value = INT64_MIN;
+		}
+		else
+		{
+			value = isNegative ? -static_cast<int64_t>(magnitude) : static_cast<int64_t>(magnitude);
+		}
+	}
+	return isValid;
+}
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-StreamCom::StreamCom(void) : m_cmdDelimiter(STREAM_COM_CDM_DELIMITER),
-							 m_paramDelimiter(STREAM_COM_PARAM_DELIMITER),
-							 m_stream(NULL)
+StreamCom::StreamCom(void) : m_serviceList(), m_parameters{}, m_commandDelimiter(STREAM_COM_CDM_DELIMITER),
+							 m_parameterDelimiter(STREAM_COM_PARAM_DELIMITER),
+							 m_stream(NULL), m_receiveBuffer{}, m_receivedByteCount(0U),
+							 m_lastReceivedByteMs(0U), m_shouldDiscardInput(false), m_isProcessingInput(false)
 {
 #if STREAM_COM_DEFAULT_LIST_ENABLE == true
-	for (uint16_t i = 0; i < STREAM_COM_DEFAULT_LIST_SIZE; i++)
+	for (uint16_t defaultServiceIndex = 0; defaultServiceIndex < STREAM_COM_DEFAULT_LIST_SIZE; defaultServiceIndex++)
 	{
-		m_serviceList.push_back(&StreamCom_default_list[i]);
+		m_serviceList.push_back(&StreamCom_default_list[defaultServiceIndex]);
 	}
 #endif
 }
@@ -32,52 +84,129 @@ StreamCom::StreamCom(void) : m_cmdDelimiter(STREAM_COM_CDM_DELIMITER),
  ******************************************************************************/
 void StreamCom::loop(void)
 {
-
-	String str, v1, v2;
-	bool status = false;
-	bool found = false;
-	bool is_verified = false;
-
-	if (m_stream->available() > 0)
+	if ((m_stream != nullptr) && !m_isProcessingInput)
 	{
-		str = m_stream->readString();
-		is_verified = stringVerify(&str);
-
-		if (is_verified)
+		m_isProcessingInput = true;
+		// Bound each call even when the producer continuously sends data.
+		for (uint16_t consumedByteCount = 0U; (consumedByteCount < 64U) && (m_stream->available() > 0); ++consumedByteCount)
 		{
-			/*Split the read String into two parts........*/
-			stringSplit(&str, &v1, m_cmdDelimiter); /*Set Split string as initialization*/
-			stringSplit(NULL, &v2, m_cmdDelimiter); /*Set NULL to use the given string for the next part*/
+			const int16_t receivedValue     = static_cast<int16_t>(m_stream->read());
+			const char    receivedCharacter = static_cast<char>(receivedValue);
 
-			for (uint8_t i = 0; i < m_serviceList.size(); i++)
+			if (receivedValue < 0)
 			{
-				if (v1.equals(m_serviceList[i]->token))
+				break;
+			}
+			m_lastReceivedByteMs = static_cast<uint32_t>(millis());
+			if ((receivedCharacter == '\r') || (receivedCharacter == '\n'))
+			{
+				if (!m_shouldDiscardInput && (m_receivedByteCount > 0U))
 				{
-					if (m_serviceList[i]->nParams != 0)
+					m_receiveBuffer[m_receivedByteCount] = '\0';
+					processInput(m_receiveBuffer, m_receivedByteCount);
+				}
+				m_receivedByteCount = 0U;
+				m_shouldDiscardInput = false;
+			}
+			else if (!m_shouldDiscardInput)
+			{
+				if ((receivedCharacter == '\0') || (m_receivedByteCount >= STREAM_COM_RX_BUFFER_SIZE - 1U))
+				{
+					m_shouldDiscardInput = true;
+					m_receivedByteCount = 0U;
+					(void)m_stream->println(F("...ERROR: INVALID OR OVERSIZE INPUT..."));
+				}
+				else
+				{
+					m_receiveBuffer[m_receivedByteCount++] = receivedCharacter;
+				}
+			}
+		}
+#if STREAM_COM_IDLE_TIMEOUT_MS > 0
+		if ((m_stream->available() <= 0) &&
+			(static_cast<uint32_t>(static_cast<uint32_t>(millis()) - m_lastReceivedByteMs) >= STREAM_COM_IDLE_TIMEOUT_MS))
+		{
+			if (!m_shouldDiscardInput && (m_receivedByteCount > 0U))
+			{
+				m_receiveBuffer[m_receivedByteCount] = '\0';
+				processInput(m_receiveBuffer, m_receivedByteCount);
+			}
+			m_receivedByteCount = 0U;
+			m_shouldDiscardInput = false;
+		}
+#endif
+		m_isProcessingInput = false;
+	}
+}
+
+void StreamCom::processInput(const char *pReceivedText, uint16_t receivedLength)
+{
+
+	String receivedCommand = pReceivedText == nullptr ? "" : pReceivedText;
+
+	String commandToken{};
+	String parameterText{};
+	const char *pSeparator        = nullptr;
+	uint16_t   delimiterOffset    = 0U;
+	bool       isSplitComplete    = true;
+	bool       isSuccessful       = false;
+	bool       hasMatchingService = false;
+	bool       isCommandValid     = false;
+
+	if ((m_stream != nullptr) && (pReceivedText != nullptr) && (receivedCommand.length() == receivedLength))
+	{
+		isCommandValid = validateCommandText(&receivedCommand);
+
+		if (isCommandValid)
+		{
+			// Split only once: a String parameter may itself contain '='.
+			pSeparator = strpbrk(receivedCommand.c_str(), m_commandDelimiter);
+			if (pSeparator != nullptr)
+			{
+				delimiterOffset = static_cast<uint16_t>(pSeparator - receivedCommand.c_str());
+				commandToken = receivedCommand.substring(0U, delimiterOffset);
+				parameterText = receivedCommand.substring(delimiterOffset + 1U);
+				isSplitComplete = commandToken.length() == delimiterOffset &&
+					parameterText.length() == receivedCommand.length() - delimiterOffset - 1U;
+			}
+			else
+			{
+				commandToken = receivedCommand;
+				isSplitComplete = commandToken.length() == receivedCommand.length();
+			}
+			commandToken.trim();
+
+			for (uint16_t serviceIndex = 0; isSplitComplete && serviceIndex < m_serviceList.size(); serviceIndex++)
+			{
+				if (commandToken.equals(m_serviceList[serviceIndex]->token))
+				{
+					if (m_serviceList[serviceIndex]->nParams != 0)
 					{
-						status = executeCommand(&v2, i);
+						isSuccessful = executeCommand(&parameterText, serviceIndex);
 					}
 					else
 					{
-						status = executeCommand(NULL, i);
+						parameterText.trim();
+						isSuccessful = (parameterText.length() == 0U) && executeCommand(NULL, serviceIndex);
 					}
-					found = true;
+					hasMatchingService = true;
+					break; // A callback may change the registry; dispatch exactly once.
 				}
 			}
 
-			if (status == false && found == true)
+			if (isSuccessful == false && hasMatchingService == true)
 			{
-				m_stream->println(F("...ERROR: CANNOT EXECUTE FUNCTION..."));
+				(void)m_stream->println(F("...ERROR: CANNOT EXECUTE FUNCTION..."));
 			}
-			else if (status == false && found == false)
+			else if (isSuccessful == false && hasMatchingService == false)
 			{
-				m_stream->print(F("...UNKNOWN TOKEN - "));
-				m_stream->print(str);
-				m_stream->print(F(" - Status = "));
-				m_stream->print(status);
-				m_stream->print(F(" - Found = "));
-				m_stream->print(found);
-				m_stream->println("");
+				(void)m_stream->print(F("...UNKNOWN TOKEN - "));
+				(void)m_stream->print(receivedCommand);
+				(void)m_stream->print(F(" - Status = "));
+				(void)m_stream->print(isSuccessful);
+				(void)m_stream->print(F(" - Found = "));
+				(void)m_stream->print(hasMatchingService);
+				(void)m_stream->println("");
 			}
 			else
 			{
@@ -86,7 +215,7 @@ void StreamCom::loop(void)
 		}
 		else
 		{
-			m_stream->println(F("...EMPTY STRING RECEIVED ..."));
+			(void)m_stream->println(F("...EMPTY STRING RECEIVED ..."));
 		}
 	}
 	return;
@@ -95,201 +224,239 @@ void StreamCom::loop(void)
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-void StreamCom::init(Stream &stream, Service_t *paramList, uint16_t size)
+void StreamCom::init(Stream &stream, Service_t *pServiceList, uint16_t serviceCount)
 {
 	m_stream = &stream;
-	mThis = this;
-
-	Serial.print("MTHIS: ");
-	Serial.println((uint32_t)mThis);
-
-	for (uint16_t i = 0; i < size; i++)
+	m_serviceList.clear();
+	m_receivedByteCount = 0U;
+	m_shouldDiscardInput = false;
+	m_lastReceivedByteMs = static_cast<uint32_t>(millis());
+#if STREAM_COM_DEFAULT_LIST_ENABLE == true
+	for (uint16_t serviceIndex = 0U; serviceIndex < STREAM_COM_DEFAULT_LIST_SIZE; ++serviceIndex)
 	{
-		m_serviceList.push_back(&paramList[i]);
+		m_serviceList.push_back(&StreamCom_default_list[serviceIndex]);
 	}
-	m_list_size = size;
+#endif
+
+	for (uint16_t serviceIndex = 0; (pServiceList != nullptr) && (serviceIndex < serviceCount); serviceIndex++)
+	{
+		addService(pServiceList[serviceIndex]);
+	}
+	if ((pServiceList == nullptr) && (serviceCount != 0U))
+	{
+		(void)m_stream->println(F("...ERROR: NULL SERVICE LIST..."));
+	}
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-bool StreamCom::executeCommand(String *paramStr, uint8_t paramListIdx)
+bool StreamCom::executeCommand(String *pParameterText, uint16_t serviceIndex)
 {
-	bool status = false;
+	bool isSuccessful = false;
 
-	if (paramStr != NULL)
+	if (pParameterText != NULL)
 	{
-		status = splitParameter(paramStr, paramListIdx);
-		if (status == true)
+		isSuccessful = splitParameters(pParameterText, serviceIndex);
+		if (isSuccessful == true)
 		{
-			convertParameter(paramListIdx);
+			isSuccessful = convertParameters(serviceIndex);
 		}
 	}
 	else
 	{
-		status = !paramsAvailable(paramListIdx);
+		isSuccessful = !hasParameters(serviceIndex);
 	}
 
-	executeCallback(paramListIdx);
-	return status;
+	if (isSuccessful)
+	{
+		executeCallback(serviceIndex);
+	}
+	return isSuccessful;
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-void StreamCom::stringSplit(String *strToSplit, String *strToStore, const char *delimiter)
+void StreamCom::executeCallback(uint16_t serviceIndex)
 {
-	char *avPtr = NULL;
-	if (strToStore != NULL)
+	Service_t *pService           = m_serviceList[serviceIndex];
+	void      *pCallbackArguments = pService->params;
+
+	if (pService->callback != nullptr)
 	{
-		if (strToSplit != NULL)
+#if STREAM_COM_DEFAULT_LIST_ENABLE == true
+		for (uint16_t defaultServiceIndex = 0U; defaultServiceIndex < STREAM_COM_DEFAULT_LIST_SIZE; ++defaultServiceIndex)
 		{
-			avPtr = strtok((char *)strToSplit->c_str(), delimiter);
+			if (pService == &StreamCom_default_list[defaultServiceIndex])
+			{
+				pCallbackArguments = this;
+			}
 		}
-		else
-		{
-			avPtr = strtok(NULL, delimiter);
-		}
-
-		if (avPtr != NULL)
-		{
-			*strToStore = String(avPtr);
-		}
+#endif
+		pService->callback(m_stream, pCallbackArguments, pService->nParams);
 	}
-
 	return;
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-void StreamCom::executeCallback(uint8_t paramListIdx)
+bool StreamCom::splitParameters(String *pParameterText, uint16_t serviceIndex)
 {
-	Service_t *entry = m_serviceList[paramListIdx];
+	bool     isValid        = (pParameterText != nullptr) && (serviceIndex < m_serviceList.size());
+	uint32_t parameterCount = 0U;
+	uint16_t fieldStart     = 0U;
 
-	if (entry->callback != nullptr)
+	if (isValid)
 	{
-		entry->callback(m_stream, entry->params, entry->nParams);
-	}
-	return;
-}
-
-/*******************************************************************************
- *  FUNCTION:
- ******************************************************************************/
-bool StreamCom::splitParameter(String *paramStr, uint8_t paramListIdx)
-{
-	bool firstCall = true;
-	bool ret = false;
-
-	if ((m_serviceList[paramListIdx]->nParams <= STREAM_COM_MAX_PARAMETER) &&
-		(m_serviceList[paramListIdx]->nParams > 0))
-	{
-		for (uint32_t i = 0; (i < m_serviceList[paramListIdx]->nParams); i++)
+		parameterCount = m_serviceList[serviceIndex]->nParams;
+		isValid = (parameterCount > 0U) && (parameterCount <= STREAM_COM_MAX_PARAMETER);
+		for (uint32_t parameterIndex = 0U; isValid && (parameterIndex < parameterCount); ++parameterIndex)
 		{
-			m_params[i] = "";
+			const char *pSeparator = strpbrk(pParameterText->c_str() + fieldStart, m_parameterDelimiter);
 
-			if (firstCall == true)
+			const uint16_t fieldEnd = pSeparator == nullptr ? static_cast<uint16_t>(pParameterText->length()) :
+				static_cast<uint16_t>(pSeparator - pParameterText->c_str());
+			isValid = (fieldEnd > fieldStart) && ((pSeparator != nullptr) == (parameterIndex + 1U < parameterCount));
+			if (isValid)
 			{
-				stringSplit(paramStr, &m_params[i], m_paramDelimiter);
-				firstCall = false;
-			}
-			else
-			{
-				stringSplit(NULL, &m_params[i], m_paramDelimiter);
+				m_parameters[parameterIndex] = pParameterText->substring(fieldStart, fieldEnd);
+				isValid = m_parameters[parameterIndex].length() == static_cast<uint16_t>(fieldEnd - fieldStart);
+				fieldStart = static_cast<uint16_t>(fieldEnd + 1U);
 			}
 		}
-		ret = true;
 	}
-	else if (m_serviceList[paramListIdx]->nParams == 0)
-	{
-		/*Nothing needs to be done. Skip this code...*/
-		ret = false;
-	}
-	else
-	{
-		m_stream->println(F("...NUMBER OF PARAMETER OUT OF BOUNDS..."));
-		ret = false;
-	}
-	return ret;
+	return isValid;
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
 template <typename T>
-T StreamCom::convert(Types_e type, uint8_t paramIdx)
+T StreamCom::convertNumericParameter(Types_e type, uint8_t parameterIndex)
 {
+	T       convertedValue = static_cast<T>(0);
+	int64_t integerValue   = 0;
+
 	switch (type)
 	{
 	case I8:
 	case I16:
 	case I32:
 	case I64:
-		return static_cast<T>(m_params[paramIdx].toInt());
+	{
+		(void)parseInteger(m_parameters[parameterIndex], integerValue); // Already validated before committing.
+		convertedValue = static_cast<T>(integerValue);
+		break;
+	}
 	case F:
 	case D:
-		return static_cast<T>(m_params[paramIdx].toDouble());
+		convertedValue = static_cast<T>(strtod(m_parameters[parameterIndex].c_str(), nullptr));
+		break;
 	case STR:
 	case RAW:
 	default:
-		return static_cast<T>(0); // Return converted 0 because String don't need to be converted.
+		break; // Strings and RAW are not numeric conversions.
 	}
+	return convertedValue;
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-void StreamCom::convertParameter(uint8_t paramListIdx)
+bool StreamCom::convertParameters(uint16_t serviceIndex)
 {
-	Service_t *entry = (Service_t *)m_serviceList[paramListIdx];
-	if (paramListIdx < m_serviceList.size())
+	bool      isValid   = serviceIndex < m_serviceList.size();
+	Service_t *pService = isValid ? m_serviceList[serviceIndex] : nullptr;
+
+	// Validate every field before modifying any application value.
+	for (uint32_t parameterIndex = 0U; isValid && (parameterIndex < pService->nParams); ++parameterIndex)
 	{
-		for (uint8_t i = 0; i < entry->nParams; i++)
+		const Types_e parameterType  = pService->paramTypes[parameterIndex];
+		String        &parameterText = m_parameters[parameterIndex];
+		int64_t       integerValue   = 0;
+		char          *pNumberEnd    = nullptr;
+		double        numberValue    = 0.0;
+		double        magnitude      = 0.0;
+
+		if (parameterType <= D)
 		{
-			uint8_t index = i;
-			switch (entry->paramTypes[i])
+			parameterText.trim();
+		}
+		if (parameterType <= I64)
+		{
+			isValid = parseInteger(parameterText, integerValue);
+			switch (parameterType)
+			{
+				case I8: isValid = isValid && integerValue >= INT8_MIN && integerValue <= INT8_MAX; break;
+				case I16: isValid = isValid && integerValue >= INT16_MIN && integerValue <= INT16_MAX; break;
+				case I32: isValid = isValid && integerValue >= INT32_MIN && integerValue <= INT32_MAX; break;
+				default: break; // I64 range is checked by parseInteger.
+			}
+		}
+		else if ((parameterType == F) || (parameterType == D))
+		{
+			errno = 0;
+			numberValue = strtod(parameterText.c_str(), &pNumberEnd);
+			isValid = pNumberEnd != parameterText.c_str() && *pNumberEnd == '\0' && errno != ERANGE && isfinite(numberValue);
+			if (isValid && (parameterType == F))
+			{
+				magnitude = fabs(numberValue);
+				isValid = magnitude <= static_cast<double>(FLT_MAX) &&
+					!((magnitude > 0.0) && (magnitude < static_cast<double>(FLT_MIN)));
+			}
+		}
+		else if (parameterType == STR)
+		{
+			isValid = static_cast<String *>(pService->params[parameterIndex])->reserve(parameterText.length());
+		}
+		else
+		{
+			isValid = parameterType == RAW;
+		}
+	}
+	if (isValid)
+	{
+		for (uint8_t parameterIndex = 0; parameterIndex < pService->nParams; parameterIndex++)
+		{
+			void *pTarget = pService->params[parameterIndex];
+
+			switch (pService->paramTypes[parameterIndex])
 			{
 			case I8:
 			{
-				int8_t *i8 = static_cast<int8_t *>(entry->params[index]);
-				*i8 = convert<int8_t>(I8, i);
+				*static_cast<int8_t *>(pTarget) = convertNumericParameter<int8_t>(I8, parameterIndex);
 				break;
 			}
 			case I16:
 			{
-				int16_t *i16 = static_cast<int16_t *>(entry->params[index]);
-				*i16 = convert<int16_t>(I16, index);
+				*static_cast<int16_t *>(pTarget) = convertNumericParameter<int16_t>(I16, parameterIndex);
 				break;
 			}
 			case I32:
 			{
-				int32_t *i32 = static_cast<int32_t *>(entry->params[index]);
-				*i32 = convert<int32_t>(I32, index);
+				*static_cast<int32_t *>(pTarget) = convertNumericParameter<int32_t>(I32, parameterIndex);
 				break;
 			}
 			case I64:
 			{
-				int64_t *i64 = static_cast<int64_t *>(entry->params[index]);
-				*i64 = convert<int64_t>(I64, index);
+				*static_cast<int64_t *>(pTarget) = convertNumericParameter<int64_t>(I64, parameterIndex);
 				break;
 			}
 			case F:
 			{
-				float *f = static_cast<float *>(entry->params[index]);
-				*f = convert<float>(F, index);
+				*static_cast<float *>(pTarget) = convertNumericParameter<float>(F, parameterIndex);
 				break;
 			}
 			case D:
 			{
-				double *d = static_cast<double *>(entry->params[index]);
-				*d = convert<double>(D, index);
+				*static_cast<double *>(pTarget) = convertNumericParameter<double>(D, parameterIndex);
 				break;
 			}
 			case STR: /* String is a special case. No convertion needed.*/
 			{
-				String *str = static_cast<String *>(entry->params[index]);
-				*str = String(m_params[index]);
+				*static_cast<String *>(pTarget) = m_parameters[parameterIndex];
 				break;
 			}
 			case RAW:
@@ -302,43 +469,39 @@ void StreamCom::convertParameter(uint8_t paramListIdx)
 			}
 		}
 	}
+	return isValid;
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-bool StreamCom::paramsAvailable(uint8_t paramListIdx)
+bool StreamCom::hasParameters(uint16_t serviceIndex)
 {
-	return m_serviceList[paramListIdx]->nParams > 0 ? true : false;
+	return m_serviceList[serviceIndex]->nParams > 0 ? true : false;
 }
 
 /*******************************************************************************
  *  FUNCTION:
  ******************************************************************************/
-bool StreamCom::stringVerify(String *readString)
+bool StreamCom::validateCommandText(String *pCommandText)
 {
-	bool ret = false;
-	bool cr_lf_eos;
-	if (readString != NULL)
+	bool isValid = false;
+
+	if (pCommandText != NULL)
 	{
-		readString->trim();
-		cr_lf_eos = readString->endsWith("\r\n");
-		if (cr_lf_eos)
-		{
-			readString->remove(readString->length() - 3, 2);
-		}
+		pCommandText->trim();
 
-		if (readString->length() > 0)
+		if (pCommandText->length() > 0)
 		{
-			ret = true;
+			isValid = true;
 		}
 	}
-	return ret;
+	return isValid;
 }
 
 uint16_t StreamCom::getServiceQuantity(void)
 {
-	return m_serviceList.size();
+	return static_cast<uint16_t>(m_serviceList.size());
 }
 
 /**
@@ -346,104 +509,130 @@ uint16_t StreamCom::getServiceQuantity(void)
  */
 void StreamCom::printHelp()
 {
-	m_stream->println("The following commands are available:");
-	m_stream->println("");
-	m_stream->println("Service: 0 ---------");
-	for (uint16_t i = 0; i < m_serviceList.size(); i++)
+	if (m_stream != nullptr)
 	{
-		const Service_t &paramList = *m_serviceList[i];
-		m_stream->print("Command: ");
-		m_stream->println(paramList.token);
-
-		if (paramList.nParams > 0)
+		(void)m_stream->println("The following commands are available:");
+		(void)m_stream->println("");
+		for (uint16_t serviceIndex = 0; serviceIndex < m_serviceList.size(); serviceIndex++)
 		{
-			m_stream->println("Parameters:");
+			const Service_t &service = *m_serviceList[serviceIndex];
 
-			for (uint8_t j = 0; j < paramList.nParams; j++)
+			(void)m_stream->print("Service: ");
+			(void)m_stream->print(serviceIndex);
+			(void)m_stream->println(" ---------");
+			(void)m_stream->print("Command: ");
+			(void)m_stream->println(service.token);
+
+			if (service.nParams > 0)
 			{
-				m_stream->print("  - Parameter ");
-				m_stream->print(j + 1);
-				m_stream->print(": ");
+				(void)m_stream->println("Parameters:");
 
-				switch (paramList.paramTypes[j])
+				for (uint8_t parameterIndex = 0; parameterIndex < service.nParams; parameterIndex++)
 				{
-				case I8:
-					m_stream->println("Signed 8-bit integer");
-					break;
-				case I16:
-					m_stream->println("Signed 16-bit integer");
-					break;
-				case I32:
-					m_stream->println("Signed 32-bit integer");
-					break;
-				case I64:
-					m_stream->println("Signed 64-bit integer");
-					break;
-				case F:
-					m_stream->println("Floating-point number");
-					break;
-				case D:
-					m_stream->println("Double-precision floating-point number");
-					break;
-				case STR:
-					m_stream->println("String");
-					break;
-				case NONE:
-					m_stream->println("No Parameter");
-					break;
-				default:
-					m_stream->println("Unknown type");
-					break;
+					(void)m_stream->print("  - Parameter ");
+					(void)m_stream->print(parameterIndex + 1);
+					(void)m_stream->print(": ");
+
+					switch (service.paramTypes[parameterIndex])
+					{
+					case I8:
+						(void)m_stream->println("Signed 8-bit integer");
+						break;
+					case I16:
+						(void)m_stream->println("Signed 16-bit integer");
+						break;
+					case I32:
+						(void)m_stream->println("Signed 32-bit integer");
+						break;
+					case I64:
+						(void)m_stream->println("Signed 64-bit integer");
+						break;
+					case F:
+						(void)m_stream->println("Floating-point number");
+						break;
+					case D:
+						(void)m_stream->println("Double-precision floating-point number");
+						break;
+					case STR:
+						(void)m_stream->println("String");
+						break;
+					case RAW:
+						(void)m_stream->println("Raw application context (not converted)");
+						break;
+					case NONE:
+						(void)m_stream->println("No Parameter");
+						break;
+					default:
+						(void)m_stream->println("Unknown type");
+						break;
+					}
 				}
 			}
+			else
+			{
+				(void)m_stream->println("No parameters.");
+			}
 		}
-		else
-		{
-			m_stream->println("No parameters.");
-		}
-
-		m_stream->print("Service: ");
-		m_stream->print((uint16_t)i + 1);
-		m_stream->println(" ---------");
 	}
 }
 
 void StreamCom::addService(Service_t &service)
 {
-	if (serviceExists(service.token) == -1)
+	bool isValid = (service.token != nullptr) && (service.nParams <= STREAM_COM_MAX_PARAMETER);
+
+	if (isValid)
+	{
+		isValid = (*service.token != '\0') && (strpbrk(service.token, " \t\r\n") == nullptr) &&
+			(strpbrk(service.token, m_commandDelimiter) == nullptr) && (strlen(service.token) < STREAM_COM_RX_BUFFER_SIZE) &&
+			(findServiceIndex(service.token) < 0) && (m_serviceList.size() < UINT16_MAX);
+	}
+	for (uint32_t parameterIndex = 0U; isValid && parameterIndex < service.nParams; ++parameterIndex)
+	{
+		const Types_e parameterType = service.paramTypes[parameterIndex];
+
+		isValid = (parameterType >= I8) && (parameterType <= RAW) &&
+			((parameterType == RAW) || (service.params[parameterIndex] != nullptr));
+	}
+	if (isValid)
 	{
 		m_serviceList.push_back(&service);
 	}
-}
-
-void StreamCom::deleteService(uint16_t service_entry)
-{
-	if (service_entry < m_serviceList.size())
+	else if (m_stream != nullptr)
 	{
-		m_serviceList.erase(m_serviceList.begin() + service_entry);
+		(void)m_stream->println(F("...ERROR: INVALID OR DUPLICATE SERVICE..."));
 	}
 }
 
-void StreamCom::deleteService(const char *service_token)
+void StreamCom::deleteService(uint16_t serviceIndex)
 {
-	int16_t service_num = serviceExists(service_token);
-	if (service_num >= 0)
+	if (serviceIndex < m_serviceList.size())
 	{
-		deleteService(service_num);
+		(void)m_serviceList.erase(m_serviceList.begin() + serviceIndex);
 	}
 }
 
-int16_t StreamCom::serviceExists(const char *serviceToken)
+void StreamCom::deleteService(const char *pServiceToken)
 {
-	bool exists = false;
-	int16_t service_num = -1;
-	for (uint16_t i = 0; (i < m_serviceList.size() && exists == false); i++)
+	int32_t serviceIndex = findServiceIndex(pServiceToken);
+
+	if (serviceIndex >= 0)
 	{
-		if (strcmp(m_serviceList[i]->token, serviceToken) == 0)
+		deleteService(static_cast<uint16_t>(serviceIndex));
+	}
+}
+
+int32_t StreamCom::findServiceIndex(const char *pServiceToken)
+{
+	bool    hasMatchingService = false;
+	int32_t serviceIndex       = -1;
+
+	for (uint16_t candidateIndex = 0; (pServiceToken != nullptr && candidateIndex < m_serviceList.size() && hasMatchingService == false); candidateIndex++)
+	{
+		if (strcmp(m_serviceList[candidateIndex]->token, pServiceToken) == 0)
 		{
-			exists = true;
-			service_num = i;
+			hasMatchingService = true;
+			serviceIndex = candidateIndex;
 		}
 	}
-	return service_num;
+	return serviceIndex;
 }

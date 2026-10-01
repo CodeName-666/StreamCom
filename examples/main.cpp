@@ -1,99 +1,79 @@
+/** @file main.cpp @brief Serial command example for the supported Arduino boards. */
 #include <Arduino.h>
 #include "StreamCom.h"
 
 
-#if __has_include("Login.h")
-    #include "Login.h"
-    const char* ssid = WIFI_SSID;            
-    const char* password = WIFI_PASS;
-#else 
-    const char* ssid = "Wifi SSID here";            
-    const char* password = "Wifi Password here";
-#endif
-
-#define NUMBER_OF_COMMANDS      3
+/** @brief Number of application commands. */
+#define NUMBER_OF_COMMANDS      2
 
 /* Global Parameter definition for StreamCom usage */
-uint32_t set_i_var = 0;
-uint32_t p = 0;
-float i = 0, d = 0;
+int32_t gIntegerSetting = 0;
+int32_t gProportionalGain = 0;
+float gIntegralGain = 0.0f;
+float gDerivativeGain = 0.0f;
 
 
 /*==== CALLBACKS for COMMANDOS ===================== */
 /**
- * @brief Callback for Commmand RESET
- * 
- * @param stream Ref to stream for response if needed
- * @param args No args here. All defined as NULL
- * @param nParams 0
+ * @brief Print the values received by the PID command.
+ *
+ * @param[in,out] pStream Response stream.
+ * @param[in] pCallbackArguments Targets for proportional, integral and derivative gain
+ * @param[in] parameterCount 3
  */
-void reset(Stream* stream, void* args, uint32_t nParams)
+void printPidValues(Stream* pStream, void* pCallbackArguments, uint32_t parameterCount)
 {
-    stream->println("Restart of ECU\n");
-
-}
-
-/**
- * @brief Callback for Commmand PID
- * 
- * @param stream Ref to stream for response if needed
- * @param args No args here. All defined as NULL
- * @param nParams 3
- */
-void set_pid(Stream* stream, void* args, uint32_t nParams)
-{
-    uint32_t currPVal = STREAMCOM_GET_VALUE(uint32_t,args,0);
-    float currIVal    = STREAMCOM_GET_VALUE(float,args,1);
-    float currDVal    = STREAMCOM_GET_VALUE(float,args,2);
-
-    uint32_t* currPPtr = STREAMCOM_GET_PTR(uint32_t,args,0);
-    float* currIPtr    = STREAMCOM_GET_PTR(float,args,1);
-    float* currDPtr    = STREAMCOM_GET_PTR(float,args,2);
-
-    
+    if ((pStream != nullptr) && (pCallbackArguments != nullptr) && (parameterCount == 3U))
+    {
+        (void)pStream->print("PID: ");
+        (void)pStream->print(STREAMCOM_GET_VALUE(int32_t, pCallbackArguments, 0U));
+        (void)pStream->print(';');
+        (void)pStream->print(STREAMCOM_GET_VALUE(float, pCallbackArguments, 1U));
+        (void)pStream->print(';');
+        (void)pStream->println(STREAMCOM_GET_VALUE(float, pCallbackArguments, 2U));
+    }
 }
 
 
 /*=== Commando and Parameter defintion =============================================*/
-Service_t paramlist[NUMBER_OF_COMMANDS] = {
+Service_t gServices[NUMBER_OF_COMMANDS] = {
 /*-----|  CMD  |      Param Ptr List         |     Param Type List  | NrPar| Clbk |-*/
-/*[0]*/{"SET_I", {&set_i_var,NULL ,NULL, NULL} ,{I32 ,NONE,NONE,NONE},   1 , NULL},
-/*[1]*/{"PID"  , {&p        ,&i   ,&d  , NULL} ,{I32 ,F   ,F   ,NONE},   3 , set_pid}
+/*[0]*/{"SET_I", {&gIntegerSetting}, {I32}, 1, NULL},
+/*[1]*/{"PID", {&gProportionalGain, &gIntegralGain, &gDerivativeGain}, {I32, F, F}, 3, printPidValues}
 };
 
 
-StreamCom streamComSerial;
-StreamCom streamComTelnet;
+StreamCom gSerialCommands;
 
-uint32_t last_set_i_var = 0; /* Parameter to print only on change*/
 
 
 /**
- * Usage of StreamCom: 
- * 
- * a. Connect over Serial/Telnet or other Stream interface.
+ * @brief Initialize the example. Usage of StreamCom:
+ *
+ * a. Connect over Serial at 115200 baud.
  * b. Enter of Commands the following way (here for PID Command):
  *      PID=15;0.12;0.23
- * 
- * c. Result: PDI Callback [set_pid] should be called and executed with
+ *
+ * c. Result: PID Callback [printPidValues] should be called and executed with
  *    parsed parameter.
- * 
+ *
  * Hint: Token to identify Command and Data is '=' [default].
  *       Token to differ between parameter is ';' [default].
- * 
+ *
  */
-void setup(void) 
+void setup(void)
 {
     /*.... Usage of SteamCom over Serial ...*/
     Serial.begin(115200);
-    streamComSerial.init(Serial,paramlist,NUMBER_OF_COMMANDS);
-   
+    gSerialCommands.init(Serial,gServices,NUMBER_OF_COMMANDS);
+
 
 }
 
 
-void loop(void) 
+/** @brief Process available serial input without waiting for a complete line. */
+void loop(void)
 {
-    streamComSerial.loop();
+    gSerialCommands.loop();
 
 }

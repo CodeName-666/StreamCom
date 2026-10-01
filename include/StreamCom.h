@@ -1,5 +1,6 @@
-/*
- * StreamCom.h
+/**
+ * @file StreamCom.h
+ * @brief Command definitions and StreamCom interface.
  *
  *  Created on: 12.11.2021
  *      Author: c.seidel
@@ -27,6 +28,21 @@
 #define STREAM_COM_PARAM_DELIMITER ";"
 #endif
 
+/** @brief Maximum received command length including the terminating NUL. */
+#ifndef STREAM_COM_RX_BUFFER_SIZE
+#define STREAM_COM_RX_BUFFER_SIZE 128U
+#endif
+
+/** @brief Legacy command completion after idle time in ms; zero requires CR/LF. */
+#ifndef STREAM_COM_IDLE_TIMEOUT_MS
+#define STREAM_COM_IDLE_TIMEOUT_MS 1000UL
+#endif
+
+static_assert(STREAM_COM_MAX_PARAMETER > 0U && STREAM_COM_MAX_PARAMETER <= 255U, "Invalid parameter count");
+static_assert(STREAM_COM_RX_BUFFER_SIZE > 1U && STREAM_COM_RX_BUFFER_SIZE <= 65535U, "Invalid receive buffer size");
+static_assert(STREAM_COM_IDLE_TIMEOUT_MS <= 0x7FFFFFFFUL, "Invalid idle timeout");
+static_assert(sizeof(STREAM_COM_CDM_DELIMITER) > 1U && sizeof(STREAM_COM_PARAM_DELIMITER) > 1U, "Empty delimiters");
+
 #if STREAM_COM_DEFAULT_LIST_ENABLE == true
 #define STREAM_COM_DEFAULT_LIST_SIZE 3u
 #endif
@@ -45,7 +61,7 @@
  *
  */
 #define STREAMCOM_GET_VALUE(RTYPE, PTR, PNUM) \
-    **(RTYPE **)(PTR + PNUM * sizeof(void *))
+    (*static_cast<RTYPE *>(static_cast<void **>((PTR))[(PNUM)]))
 
 /**
  * @brief Marco to get the parameter pointer of a implemented callback function
@@ -61,7 +77,7 @@
  *
  */
 #define STREAMCOM_GET_PTR(RTYPE, PTR, PNUM) \
-    *(RTYPE **)(PTR + PNUM * sizeof(void *))
+    (static_cast<RTYPE *>(static_cast<void **>((PTR))[(PNUM)]))
 
 /**
  * @brief Definition of the StreamCom callback function type.
@@ -135,7 +151,7 @@ enum Types_e
  *                  variables representing the respective parameters.
  *
  * @param paramTypes An array of parameter types.
- *                  This array defines the type of each parameter to convert the string input correctly.
+ *                  This array defines the type of each parameter to convertNumericParameter the string input correctly.
  *                  The types are defined using the Types_e enumeration.
  *
  * @param nParams   The number of parameters used by the command.
@@ -149,7 +165,7 @@ enum Types_e
  * Example usage:
  * @code{.cpp}
  * // Define a callback function for a command
- * void myCallback(Stream* stream, void* args, uint32_t nParams, Stream* mThis) {
+ * void myCallback(Stream* stream, void* args, uint32_t nParams) {
  *     // Handle the callback logic here
  * }
  *
@@ -181,6 +197,9 @@ using ServiceList = std::vector<Service_t *>;
 
 /**
  * @brief class to communicate over a stream.
+ * @note Not ISR-safe. Serialize access to each instance and any shared targets.
+ * @warning Arduino String and std::vector are retained for compatibility. They may
+ * allocate memory. Float/double remain supported even on targets without an FPU.
  */
 class StreamCom
 {
@@ -198,10 +217,12 @@ public:
     /**
      * @brief Initializes the StreamCom class.
      * @param stream The stream over which the communication should take place.
-     * @param paramList The parameter list.
-     * @param size The size of the parameter list.
+     * @param pServiceList The service list.
+     * @param serviceCount The number of descriptors.
+     * @note Reinitialization replaces the previous list and resets pending input.
+     * The stream, descriptors, tokens and parameter targets must outlive registration.
      */
-    void init(Stream &stream, Service_t *paramList, uint16_t size);
+    void init(Stream &stream, Service_t *pServiceList, uint16_t serviceCount);
 
     /**
      * @brief Prints the help information.
@@ -217,94 +238,101 @@ public:
     /**
      * @brief Adds a service to the parameter list.
      * @param service The service to be added.
+     * @note The descriptor is borrowed, not copied. Do not mutate it while registered.
+     * Invalid or duplicate services are rejected. Maximum service count is UINT16_MAX.
      */
     void addService(Service_t& service);
 
     /**
      * @brief Deletes a service from the parameter list based on the entry index.
-     * @param service_entry The index of the service entry to be deleted.
+     * @param serviceIndex The index of the service entry to be deleted.
      */
-    void deleteService(uint16_t service_entry);
+    void deleteService(uint16_t serviceIndex);
 
     /**
      * @brief Deletes a service from the parameter list based on the service token.
-     * @param service_token The token of the service to be deleted.
+     * @param pServiceToken The token of the service to be deleted.
      */
-    void deleteService(const char *service_token);
+    void deleteService(const char *pServiceToken);
 
 private:
-    /**
-     * @brief Splits a string using a separator.
-     * @param strToSplit The string to split.
-     * @param strToStore The destination string to store the split parts.
-     * @param delimiter The delimiter character.
-     */
-    void stringSplit(String *strToSplit, String *strToStore, const char *delimiter);
+    /** @brief Handle one complete command.
+     * @param[in] pReceivedText Null-terminated input.
+     * @param[in] receivedLength Expected byte count, excluding the terminator. */
+    void processInput(const char *pReceivedText, uint16_t receivedLength);
 
     /**
      * @brief Checks if a string is valid.
-     * @param readString The string to check.
+     * @param pCommandText The string to check.
      * @return True if the string is valid, False otherwise.
      */
-    bool stringVerify(String *readString);
+    bool validateCommandText(String *pCommandText);
 
     /**
      * @brief Splits a parameter string into individual parameters and stores them in the parameter list.
-     * @param paramStr The parameter string to split.
-     * @param paramListIdx The index in the parameter list to store the parameters in.
+     * @param pParameterText The parameter string to split.
+     * @param serviceIndex The index in the parameter list to store the parameters in.
      * @return True if the split was successful, False otherwise.
      */
-    bool splitParameter(String *paramStr, uint8_t paramListIdx);
+    bool splitParameters(String *pParameterText, uint16_t serviceIndex);
 
     /**
      * @brief Converts a parameter to the appropriate type.
-     * @param paramListIdx The index of the parameter in the parameter list.
+     * @param serviceIndex The index of the parameter in the parameter list.
+     * @return True if all parameters were valid and their values were applied.
      */
-    void convertParameter(uint8_t paramListIdx);
+    bool convertParameters(uint16_t serviceIndex);
 
     /**
      * @brief Converts a parameter to the specified type.
      * @tparam T The type to which the parameter should be converted.
      * @param type The type of the parameter.
-     * @param paramIdx The index of the parameter in the parameter list.
+     * @param parameterIndex The index of the parameter in the parameter list.
      * @return The converted parameter.
      */
     template <typename T>
-    T convert(Types_e type, uint8_t paramIdx);
+    T convertNumericParameter(Types_e type, uint8_t parameterIndex);
 
     /**
      * @brief Executes a command.
-     * @param paramStr The command string.
-     * @param paramListIdx The index of the parameter in the parameter list.
+     * @param pParameterText The command string.
+     * @param serviceIndex The index of the parameter in the parameter list.
      * @return True if the command was executed successfully, False otherwise.
      */
-    bool executeCommand(String *paramStr, uint8_t paramListIdx);
+    bool executeCommand(String *pParameterText, uint16_t serviceIndex);
 
     /**
      * @brief Calls the callback function for a parameter.
-     * @param paramListIdx The index of the parameter in the parameter list.
+     * @param serviceIndex The index of the parameter in the parameter list.
      */
-    void executeCallback(uint8_t paramListIdx);
+    void executeCallback(uint16_t serviceIndex);
 
     /**
      * @brief Checks if parameters are available for a given index.
-     * @param paramListIdx The index of the parameter in the parameter list.
+     * @param serviceIndex The index of the parameter in the parameter list.
      * @return True if parameters are available, otherwise False.
      */
-    bool paramsAvailable(uint8_t paramListIdx);
+    bool hasParameters(uint16_t serviceIndex);
 
-    int16_t serviceExists(const char* serviceToken);
+    /** @brief Find a registered token. @param[in] pServiceToken Token to find.
+     * @return Service index, or -1 when absent or null. */
+    int32_t findServiceIndex(const char* pServiceToken);
 private:
     ServiceList m_serviceList;                   /**< Parameter list. */
-    uint16_t m_list_size;                      /**< The size of the parameter list. */
-    String m_params[STREAM_COM_MAX_PARAMETER]; /**< The parameters. */
+    String m_parameters[STREAM_COM_MAX_PARAMETER]; /**< The parameters. */
 
-    const char *m_cmdDelimiter;   /**< The delimiter for commands. */
-    const char *m_paramDelimiter; /**< The delimiter for parameters. */
+    const char *m_commandDelimiter;   /**< The delimiter for commands. */
+    const char *m_parameterDelimiter; /**< The delimiter for parameters. */
     Stream *m_stream;             /**< The stream for communication. */
+    char m_receiveBuffer[STREAM_COM_RX_BUFFER_SIZE]; /**< Bounded input, no heap growth. */
+    uint16_t m_receivedByteCount; /**< Pending bytes. */
+    uint32_t m_lastReceivedByteMs; /**< Timestamp for legacy idle completion. */
+    bool m_shouldDiscardInput; /**< Ignore the entire oversized/invalid record. */
+    bool m_isProcessingInput; /**< Prevent callback-driven recursive processing. */
 };
 
+#if STREAM_COM_DEFAULT_LIST_ENABLE == true
 extern Service_t StreamCom_default_list[STREAM_COM_DEFAULT_LIST_SIZE];
-extern StreamCom *mThis;
+#endif
 
 #endif /* StreamCom_H_ */
